@@ -1,51 +1,57 @@
 // ==UserScript==
 // @name         Market Item Value Calculator
 // @namespace    http://tampermonkey.net/
-// @version      0.1.1
-// @description  try to take over the world!
-// @author       Lemons
+// @version      0.2
+// @description  Shows the real value of items on Krunker market
+// @author       Lemons & DaRealSh0T
 // @match        *://krunker.io/social.html*
 // @run-at       document-start
 // @grant        none
 // ==/UserScript==
 
-const krValues = [
-    [300, 0.99],
-    [600, 1.79],
-    [2600, 2.49],
-    [7000, 15.99],
-    [20000, 34.99],
-    [60000, 99.99]
-];
-
-const values = krValues.map(a => +(a[0] / a[1]).toFixed(2));
+var krValue = {
+	300: 0.99,
+	600: 1.79,
+	2600: 2.49,
+	7000: 15.99,
+	20000: 34.99,
+	60000: 99.99
+};
 
 const observer = new MutationObserver(mutations => {
-    mutations.forEach(mutation => {
-        mutation.addedNodes.forEach(node => {
-            var c = node.children;
-            if (c && c[2] && c[2].className === 'marketPrice') {
-                var elem = c[2];
+	mutations.forEach(mutation => {
+		mutation.addedNodes.forEach(node => {
+			let { children } = node,
+				elem,
+				tmp,
+				currentKR = (tmp = document.getElementById('profileKR')) ? +tmp.innerText.replace(' KR', '') : 0,
+				keys = Object.keys(krValue).map(a => +a).sort((a, b) => b - a),
+				price = totalKRNeeded = value = remaining = priceOfItem = num = 0;
 
-                var num = +elem.innerText.replace(/[^0-9]/g, '');
+			if (children && (elem = [...children].find(child => child.className == 'marketPrice'))) {
+				priceOfItem = +elem.innerText.replace(/[^0-9]/g, '');
+				num = Math.max(priceOfItem - currentKR, 0);
+				
+				for (let ammount of keys) {
+					let multiplier = ~~(num / ammount);
+					price += krValue[ammount] * multiplier;
+					num -= ammount * multiplier;
+					totalKRNeeded += ammount * multiplier;
+				}
 
-                var val = [].concat(krValues).sort((a, b) => {
-                    var a1 = num - a[0];
-                    var a2 = num - b[0];
-                    return a1 - a2;
-                });
+				if (num > 0) price += krValue[300], totalKRNeeded += 300;
+				remaining = (currentKR + totalKRNeeded) - priceOfItem;
 
-                var index = krValues.findIndex(k => k[0] === val[0][0]);
-                var value = (+(num / values[index]).toFixed(2)).toLocaleString();
-
-                node.attributes.style.value += ';height:252px';
-                node.insertAdjacentHTML('beforeend', `<div style="margin-top:37px;" class="marketPrice">$${value}<span style="color:#fff"> USD</span></div>`);
-            }
-        });
-    });
+				value = (price.toFixed(2)).toLocaleString();
+				node.attributes.style.value += ';height:289px';
+				node.insertAdjacentHTML('beforeend', `<div style="margin-top:37px;" class="marketPrice">$${value}<span style="color:#fff"> USD</span>`);
+				node.insertAdjacentHTML('beforeend', `<div style="margin-top:74px;" class="marketPrice">${remaining}<span style="color:#fff"> KR</span> left over</div>`);
+			}
+		});
+	});
 });
 
 observer.observe(document.documentElement, {
-    childList: true,
-    subtree: true
+	childList: true,
+	subtree: true
 });
